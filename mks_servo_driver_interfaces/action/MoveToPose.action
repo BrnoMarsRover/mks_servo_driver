@@ -1,0 +1,8 @@
+# Request
+sensor_msgs/JointState request
+---
+# Result
+std_msgs/Bool result
+---
+# Feedback
+float64[] feedback
