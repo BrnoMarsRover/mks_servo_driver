@@ -455,7 +455,7 @@ class ManipulatorDriver(Node):
         self.act_pos_lock = threading.Lock()
 
         # Nastavení CAN sběrnice
-        self.can_bus = can.Bus(interface='socketcan', channel='can0', bitrate=1000000)
+        self.can_bus = can.Bus(interface='socketcan', channel='can1', bitrate=1000000)
         # bitrate 1Mbit/s -> 125 kByte/sec
         # 1 CAN zpráva: 6*(8byte req + 8byte resp) = 100 byte
         # -> MAX 1250 dotazů za sec
