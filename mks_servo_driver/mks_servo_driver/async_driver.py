@@ -435,11 +435,11 @@ class ManipulatorDriver(Node):
         self.HOMING_DIRECTIONS = [Direction.CW, Direction.CW, Direction.CW, Direction.CW, Direction.CW]
         max_servo_speeds_deg = [180, 180, 180, 90, 90]
         self.MAX_SERVO_SPEEDS_RAD = [deg*pi/180 for deg in max_servo_speeds_deg] # v SW se racuje s RAD, ale zadává se jako deg pro lepší představu
-        self.GEAR_RATIOS = [10, 10, 10, 10, 10]
+        self.GEAR_RATIOS = [21, 120, 120, 5.6, 5.6]
         # teď je všude minimální zrychlení natvrdo (smazat acc_mks=1)!!
         ramp_deg = [900, 900, 900, 900, 900]
         self.RAMP_RAD = [deg*pi/180 for deg in ramp_deg]
-        self.INVERT_DIRECTIONS = [False, True, True, True, True]
+        self.INVERT_DIRECTIONS = [False, True, True, False, False]
         self.ADAPTIVE_CURRENT = [True, True, True, True, True]
         self.MOTOR_SUBDIVISIONS = 64
         zero_offset_deg = [0.0, 0.0, 0.0, 0.0, 0.0]
