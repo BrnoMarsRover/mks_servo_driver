@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mks_servo_driver_interfaces</name>
+  <name>manipulator_servo_driver_interfaces</name>
   <version>0.0.0</version>
-  <description>Custom interfaces for MKS servo can driver</description>
+  <description>Interfaces for manipulator driver</description>
   <maintainer email="stanislav.svediroh@vut.cz">ros</maintainer>
   <license>MIT</license>
 

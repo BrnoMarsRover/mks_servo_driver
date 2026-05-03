@@ -11,11 +11,12 @@ from math import pi
 from typing import List, Dict, Tuple
 import traceback
 import time
+import math
 from sensor_msgs.msg import JointState
 
 
 from .mks_enums import MksCommands, Direction, WorkMode, EndStopLevel, Enable, GoHomeResult, RunMotorResult, MotorStatus, SuccessStatus
-from mks_servo_driver_interfaces.srv import ChangeMode, ResetAxis, HomeAxis
+from manipulator_servo_driver_interfaces.srv import ChangeMode, ResetAxis, HomeAxis
 
 # Globální slovník odpovědí CANu. Sdílený mezi všechny serva
 #              (can_id, cmd_code) -> can response future
@@ -28,7 +29,7 @@ async def free_loop_resources():
 def can_parse_response(msg:can.Message):
     servo_id = msg.arbitration_id
     cmd_code = msg.data[0]
-    print(f"Parsing message from servo id {servo_id} with code {cmd_code}")
+    #print(f"Parsing message from servo id {servo_id} with code {cmd_code}")
     return (servo_id, cmd_code), msg.data    # jako klíč ve slovníku je nutné uchovávat ID serva i command
 
 
@@ -54,7 +55,8 @@ async def can_process_response(msg:can.Message): #vrací bytes
         except Exception as e:
             print(f"Chyba future.set_result {key}: exc: {e}") 
     else:        
-        print("Obdržená zprává není ve slovníku očekávaných odpovědí")
+        noop = 1
+        #print("Obdržená zprává není ve slovníku očekávaných odpovědí")
 
 
 # V nekonečné smyčce poslouchá CAN a responses ukládá do slovníku can_resp_dict, ze kterého si je vyzvedávají jednotlivé funkce pomocí futures
@@ -303,8 +305,9 @@ class JointDriver():
 
         vel_rpm = int(round(vel_rad * 30/pi * self.gear_ratio * self.dir))
 
-        if (self.can_id-1) == 2 and True:   # Joint2 má obrácený směr pouze ve velocity režimu ¯\_(ツ)_/¯ don't ask
-            vel_rpm = -vel_rpm
+        #if (self.can_id-1) == 2 and True:   # Joint2 má obrácený směr pouze ve velocity režimu ¯\_(ツ)_/¯ don't ask
+        #    vel_rpm = -vel_rpm
+        #vel_rpm = -vel_rpm
 
         dir = Direction.CCW if vel_rpm < 0 else Direction.CW
         vel_rpm = min(abs(vel_rpm), 3000)
@@ -427,26 +430,33 @@ class ManipulatorDriver(Node):
     def __init__(self):
         super().__init__('async_servo_node')
 
-        self.JOINT_COUNT = 4
-        self.HOMING_SPEEDS = [1, 1, 1, 1]
-        self.HOMING_DIRECTIONS = [Direction.CW, Direction.CW, Direction.CW, Direction.CW]
-        max_servo_speeds_deg = [45, 45, 45, 45]
+        self.JOINT_COUNT = 5
+        self.HOMING_SPEEDS = [1, 1, 1, 1, 1]
+        self.HOMING_DIRECTIONS = [Direction.CW, Direction.CW, Direction.CW, Direction.CW, Direction.CW]
+        max_servo_speeds_deg = [180, 180, 180, 90, 90]
         self.MAX_SERVO_SPEEDS_RAD = [deg*pi/180 for deg in max_servo_speeds_deg] # v SW se racuje s RAD, ale zadává se jako deg pro lepší představu
-        self.GEAR_RATIOS = [47, 47, 47, 47]
+        self.GEAR_RATIOS = [10, 10, 10, 10, 10]
         # teď je všude minimální zrychlení natvrdo (smazat acc_mks=1)!!
-        ramp_deg = [0, 0, 0, 0]
+        ramp_deg = [900, 900, 900, 900, 900]
         self.RAMP_RAD = [deg*pi/180 for deg in ramp_deg]
-        self.INVERT_DIRECTIONS = [True, True, False, True]
-        self.ADAPTIVE_CURRENT = [True, True ,True, True]
+        self.INVERT_DIRECTIONS = [False, True, True, True, True]
+        self.ADAPTIVE_CURRENT = [True, True, True, True, True]
         self.MOTOR_SUBDIVISIONS = 64
-        zero_offset_deg = [0.0, 0.0, 0.0, 0.0]
+        zero_offset_deg = [0.0, 0.0, 0.0, 0.0, 0.0]
         self.ZERO_OFFSET_RAD = [deg*pi/180 for deg in zero_offset_deg]
         self.SAFETY_ANGLE_RAD = 0.0
-        self.JOINT_LIMIT_RAD = [{"lo": (-0.7854) + self.SAFETY_ANGLE_RAD, "hi": (0.7854) - self.SAFETY_ANGLE_RAD}, #{"lo": -4.0, "hi": 4.0},        # Nahradit čtením z URDF
-                                {"lo": (-0.7854) + self.SAFETY_ANGLE_RAD, "hi": (0.7854) - self.SAFETY_ANGLE_RAD},
-                                {"lo": (-0.7854) + self.SAFETY_ANGLE_RAD, "hi": (0.7854) - self.SAFETY_ANGLE_RAD},
-                                {"lo": (-0.7854) + self.SAFETY_ANGLE_RAD, "hi": (0.7854) - self.SAFETY_ANGLE_RAD}]
-        self.mode: int = 1 # 0 - standby, 1 - position, 2 - speed
+        #self.JOINT_LIMIT_RAD = [{"lo": 100 * (-3.14) + self.SAFETY_ANGLE_RAD, "hi": 100 * (3.14) - self.SAFETY_ANGLE_RAD},
+        #                        {"lo": 100 * (-3.14) + self.SAFETY_ANGLE_RAD, "hi": 100 * (3.14) - self.SAFETY_ANGLE_RAD},
+        #                        {"lo": 100 * (-3.14) + self.SAFETY_ANGLE_RAD, "hi": 100 * (3.14) - self.SAFETY_ANGLE_RAD},
+        #                        {"lo": 100 * (-3.14) + self.SAFETY_ANGLE_RAD, "hi": 100 * (3.14) - self.SAFETY_ANGLE_RAD},
+        #                        {"lo": 100 * (-3.14) + self.SAFETY_ANGLE_RAD, "hi": 100 * (3.14) - self.SAFETY_ANGLE_RAD}]
+        # Turn off limits for the competition
+        self.JOINT_LIMIT_RAD = [{"lo": -math.inf, "hi": math.inf},
+                                {"lo": -math.inf, "hi": math.inf},
+                                {"lo": -math.inf, "hi": math.inf},
+                                {"lo": -math.inf, "hi": math.inf},
+                                {"lo": -math.inf, "hi": math.inf}]
+        self.mode: int = 2 # 0 - standby, 1 - position, 2 - speed
         self.last_read_joint_pos = [0.0] * self.JOINT_COUNT
         self.last_read_joint_vel = [0.0] * self.JOINT_COUNT
         self.act_vel_lock = threading.Lock()
@@ -455,8 +465,11 @@ class ManipulatorDriver(Node):
         self.act_pos_lock = threading.Lock()
 
         # Nastavení CAN sběrnice
-        self.can_bus = can.Bus(interface='socketcan', channel='can1', bitrate=1000000)
-        # bitrate 1Mbit/s -> 125 kByte/sec
+        self.declare_parameter('can_bus', 'can0')
+        self.can_channel = self.get_parameter('can_bus').get_parameter_value().string_value
+        self.can_bus = can.Bus(interface='socketcan', channel=self.can_channel, bitrate=500000)
+        
+	# bitrate 1Mbit/s -> 125 kByte/sec
         # 1 CAN zpráva: 6*(8byte req + 8byte resp) = 100 byte
         # -> MAX 1250 dotazů za sec
 
@@ -470,10 +483,10 @@ class ManipulatorDriver(Node):
         self.asyncio_loop = asyncio.new_event_loop()
         threading.Thread(target=self.start_can_handler, daemon=True).start()
         
-        self.create_timer(0.01, self.pos_timer_callback)
+        #self.create_timer(0.01, self.pos_timer_callback)
         self.pos_timer_lock = threading.Lock()
 
-        #self.create_timer(0.01, self.vel_timer_callback)
+        self.create_timer(0.01, self.vel_timer_callback)
         self.vel_timer_lock = threading.Lock()
 
         self.servos: List[JointDriver] = []
@@ -494,7 +507,7 @@ class ManipulatorDriver(Node):
         #self.service_reset_axis = self.create_service(ResetAxis, "manipulator/reset_single_joint", self.on_reset_axis)
         self.service_zero_axis = self.create_service(ResetAxis, "manipulator/zero_single_joint", self.on_zero_axis)
         self.service_home_axis = self.create_service(HomeAxis, "manipulator/home_single_joint", self.on_home_axis)
-        self.get_logger().info("ManipulatorDriver ready")
+        self.get_logger().info("Manipulator driver ready - changed5")
 
 
     def start_can_handler(self):
@@ -663,6 +676,9 @@ class ManipulatorDriver(Node):
             for i in range(self.JOINT_COUNT):
                 if act_pos[i] is None:
                     act_pos[i] = last_read_pos[i]
+            
+            if self.JOINT_COUNT > 4:
+                act_pos[-2:] = self.wrist_from_servo(act_pos[-2:])
 
             with self.act_pos_lock:
                 self.last_read_joint_pos = act_pos
@@ -690,7 +706,7 @@ class ManipulatorDriver(Node):
         
     async def read_all_velocity_async(self):
         tasks = []
-        for i in range(6):
+        for i in range(self.JOINT_COUNT):
             tasks.append(self.servos[i].read_single_vel())
         
         results = await asyncio.gather(*tasks)
@@ -789,6 +805,22 @@ class ManipulatorDriver(Node):
         
         return new_vel_list
 
+    @staticmethod
+    def servo_from_wrist(wristAngle: list[float]):
+        servoAngle0 = (wristAngle[0] + wristAngle[1])
+        servoAngle1 = (wristAngle[0] - wristAngle[1])
+        
+        #return wristAngle # <-- ignoruje kinematiku zápěstí a řídí serva samostatně jako předtím
+        return [servoAngle0, servoAngle1]
+
+
+    @staticmethod
+    def wrist_from_servo(servoAngle :list[float]):
+        wristAngle0 = (servoAngle[0] + servoAngle[1]) / 2
+        wristAngle1 = (servoAngle[0] - servoAngle[1]) / 2
+
+        #return servoAngle # <-- ignoruje kinematiku zápěstí a řídí serva samostatně jako předtím
+        return [wristAngle0, wristAngle1]
 
     def write_all_positions(self, msg: JointState):
         with self.pos_set_lock:
@@ -801,8 +833,16 @@ class ManipulatorDriver(Node):
             
             goal_position = self.limit_positions(goal_position)
 
-            acc = [5*pi/180 for _ in range(self.JOINT_COUNT)]
+            # Kinematika diferenciálního zápěstí - joint-->servo
+            if self.JOINT_COUNT > 4:
+                goal_position[-2:] = self.servo_from_wrist(goal_position[-2:])
+                goal_velocity[-2:] = self.servo_from_wrist(goal_velocity[-2:])
+                goal_velocity = [abs(vel) for vel in goal_velocity]
 
+            #acc = [5*pi/180 for _ in range(self.JOINT_COUNT)] #?
+            acc = [1*pi/180 for _ in range(self.JOINT_COUNT)]
+
+            #self.get_logger().error(f"goal position: {goal_position}")
             future = asyncio.run_coroutine_threadsafe(self.write_all_positions_async(goal_position, goal_velocity, acc), self.asyncio_loop)
             print(future)
             try:
@@ -837,19 +877,22 @@ class ManipulatorDriver(Node):
                     if (act_joint_pos[i] > (self.servos[i].sw_limits_rad['hi'])) and (req_joint_vel_rad[i] > 0):
                         req_joint_vel_rad[i] = 0.0
                         self.get_logger().error(f"VelCmd: Joint{i} narazil na SW limit {act_joint_pos[i]:.2f} rad")
+                
+                if self.JOINT_COUNT > 4:
+                    req_joint_vel_rad[-2:] = self.servo_from_wrist(req_joint_vel_rad[-2:])
 
                 # rampa nečte aktuální rychlost, která má velký delay, ale minulou astavenou rychlost
                 req_joint_vel_rad = self.velocity_ramp(req_joint_vel_rad, self.slow_vel_dif, self.RAMP_RAD)
 
             self.slow_vel_dif = req_joint_vel_rad
-            print(f"req_joint_vel_main: {req_joint_vel_rad}")
+            #self.get_logger().error(f"req_joint_vel_main: {req_joint_vel_rad}")
 
             future = asyncio.run_coroutine_threadsafe(self.write_all_velocity_async(req_joint_vel_rad), self.asyncio_loop)
 
             try:
                 result = future.result(timeout=1)
                 vel_succ_set = [f"{vel:.4}" if res==1 else "0.0" for res,vel in zip(result, req_joint_vel_rad)]
-                self.get_logger().info(f"set_vel: {vel_succ_set}")
+                #self.get_logger().info(f"set_vel: {vel_succ_set}")
             except asyncio.TimeoutError:
                 self.get_logger().error("Timeout while setting velocity")
             except Exception as e:

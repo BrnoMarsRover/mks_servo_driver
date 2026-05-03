@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mks_servo_driver_interfaces)
+project(manipulator_servo_driver_interfaces)
 
 if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
@@ -19,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
         "srv/ChangeMode.srv"
         "srv/ResetAxis.srv"
         "srv/HomeAxis.srv"
+        "srv/TriggerAxis.srv"
         DEPENDENCIES std_msgs sensor_msgs action_msgs
 )
 ament_export_dependencies(rosidl_default_runtime)

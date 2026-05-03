@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['mks_servo_interfaces', 'setuptools'],
     zip_safe=True,
     maintainer='ros',
     maintainer_email='stanislav.svediroh@vut.cz',
