@@ -265,7 +265,7 @@ class JointDriver():
         if mks_rpm <= 0:    # servo s rychlostí 0.0 se rozjede, ale nikdy nedojede
             return RunMotorResult.RunFail
         
-        status_bytes = await self.can_query(self.DEFAULT_RESPONSE_LENGTH, MksCommands.RUN_MOTOR_ABSOLUTE_MOTION_BY_AXIS_COMMAND, cmd)
+        status_bytes = await self.can_query(self.DEFAULT_RESPONSE_LENGTH, MksCommands.RUN_MOTOR_RELATIVE_MOTION_BY_AXIS_COMMAND, cmd)
         
         # Status start motion
         status_start_int = int.from_bytes(status_bytes[1:2], byteorder='big')      
@@ -281,7 +281,7 @@ class JointDriver():
         
         # Status finished motion - čekání na dokončení pohybu
         future = asyncio.get_event_loop().create_future()
-        cmd_code = MksCommands.RUN_MOTOR_ABSOLUTE_MOTION_BY_AXIS_COMMAND
+        cmd_code = MksCommands.RUN_MOTOR_RELATIVE_MOTION_BY_AXIS_COMMAND
         can_resp_dict[(self.can_id, cmd_code.value)] = future
 
         try:
@@ -305,9 +305,10 @@ class JointDriver():
 
         vel_rpm = int(round(vel_rad * 30/pi * self.gear_ratio * self.dir))
 
-        #if (self.can_id-1) == 2 and True:   # Joint2 má obrácený směr pouze ve velocity režimu ¯\_(ツ)_/¯ don't ask
-        #    vel_rpm = -vel_rpm
-        #vel_rpm = -vel_rpm
+        
+        if (self.can_id-1) == 2 and True:   # Joint2 má obrácený směr pouze ve velocity režimu ¯\_(ツ)_/¯ don't ask
+            vel_rpm = -vel_rpm              # Má pravdu tento člověk - Drochec
+        vel_rpm = -vel_rpm
 
         dir = Direction.CCW if vel_rpm < 0 else Direction.CW
         vel_rpm = min(abs(vel_rpm), 3000)
@@ -439,7 +440,7 @@ class ManipulatorDriver(Node):
         # teď je všude minimální zrychlení natvrdo (smazat acc_mks=1)!!
         ramp_deg = [900, 900, 900, 900, 900]
         self.RAMP_RAD = [deg*pi/180 for deg in ramp_deg]
-        self.INVERT_DIRECTIONS = [False, True, True, False, False]
+        self.INVERT_DIRECTIONS = [False, True, False, False, False]
         self.ADAPTIVE_CURRENT = [True, True, True, True, True]
         self.MOTOR_SUBDIVISIONS = 64
         zero_offset_deg = [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -839,8 +840,9 @@ class ManipulatorDriver(Node):
                 goal_velocity[-2:] = self.servo_from_wrist(goal_velocity[-2:])
                 goal_velocity = [abs(vel) for vel in goal_velocity]
 
-            #acc = [5*pi/180 for _ in range(self.JOINT_COUNT)] #?
+            #acc = [20*pi/180 for _ in range(self.JOINT_COUNT)] #?
             acc = [1*pi/180 for _ in range(self.JOINT_COUNT)]
+            #acc = [0.0] * self.JOINT_COUNT
 
             #self.get_logger().error(f"goal position: {goal_position}")
             future = asyncio.run_coroutine_threadsafe(self.write_all_positions_async(goal_position, goal_velocity, acc), self.asyncio_loop)
